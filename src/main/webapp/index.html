@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Task List</title>
+
+    <script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
+    <script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.23/browser.min.js"></script>
+    <style>
+    #container {
+      padding: 50px;
+    }
+
+    textarea {
+      width: 600px;
+      height: 100px;
+      resize: none;
+      overflow: hidden;
+      -ms-overflow-style: none;
+    }
+
+    input.taskTitle {
+      width: 300px;
+    }
+
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+
+    <script type="text/babel">
+    var xhr;
+    var container = document.querySelector("#container");
+
+    var ToDoItem = React.createClass({
+
+      setComplete: function(e) {
+        this.props.item.complete = e.currentTarget.checked;
+        this.update(e);
+
+        e.preventDefault();
+      },
+
+      setTitle: function(e) {
+        this.props.item.title = e.currentTarget.value;
+        this.update(e);
+
+        e.preventDefault();
+      },
+
+      setDescription: function(e) {
+        this.props.item.description = e.currentTarget.value;
+        this.update(e);
+
+        e.preventDefault();
+      },
+
+      update: function(e) {
+        this.props.update(this.props.index, this.props.item);
+
+        e.preventDefault();
+      },
+
+      moveUp: function(e) {
+        if (this.props.index > 0) {
+          this.props.moveUp(this.props.index);
+        }
+        e.preventDefault();
+      },
+
+      moveDown: function(e) {
+        if (this.props.index < this.props.lastIndex) {
+          this.props.moveDown(this.props.index);
+        }
+        e.preventDefault();
+      },
+
+      remove: function(e) {
+        this.props.remove(this.props.index);
+
+        e.preventDefault();
+      },
+
+      render: function() {
+        var self = this;
+        var item = this.props.item;
+        var index = this.props.index;
+        var lastIndex = this.props.lastIndex;
+        var keyIndexPair = "" + item.key +  index;
+        var moveUpKey = "moveUp" + keyIndexPair;
+        var moveDownKey = "moveDown" + keyIndexPair;
+        var moveUpDisabled = index < 1;
+        var moveDownDisabled = index > (lastIndex - 1);
+        var itemNum = index + 1;
+
+        return (<tr key={keyIndexPair}>
+          <td>
+          <div>
+          <hr />
+          </div>
+          <div>
+          <label>{itemNum}.</label>
+          &nbsp;
+          <input className="taskTitle" type="text"
+             placeholder="Task Title Required"
+             defaultValue={item.title} onBlur={self.setTitle}/>
+          &nbsp;
+          <label>Task Complete: </label>
+          <input type="checkbox"  checked={item.complete} onChange={self.setComplete} />
+          </div>
+          <div>
+          <textarea placeholder="Enter Task Details"
+              defaultValue={item.description}
+              onBlur={self.setDescription}/>
+          </div>
+          <div>
+
+          <button onClick={self.moveUp} key={moveUpKey} disabled={moveUpDisabled}>Move Up</button>
+          <button onClick={self.moveDown} key={moveDownKey} disabled={moveDownDisabled}>Move Down</button>
+          <button onClick={self.remove}>Remove</button>
+          </div>
+          </td>
+          </tr>);
+        }
+    });
+
+    var ToDoList = React.createClass({
+      firstTime: true,
+      baseUrl: "http://" + window.location.hostname + ":8080/to-do/",
+
+      getInitialState: function() {
+        return {
+          items: [],
+          newItem: {}
+        }
+      },
+
+      read: function() {
+        xhr = new XMLHttpRequest();
+        xhr.open('GET', this.baseUrl, true);
+        xhr.send();
+
+        xhr.addEventListener("readystatechange", this.processRequest, false);
+      },
+
+      create: function(e) {
+        var self = this;
+        var newItem = self.state.newItem;
+        var inputTitle = document.getElementById("newTaskTitle");
+
+        if (inputTitle.value && inputTitle.value.length  > 0) {
+          newItem.title = inputTitle.value;
+          inputTitle.value = '';
+          xhr = new XMLHttpRequest();
+          xhr.open('POST', self.baseUrl, true);
+          xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+          xhr.send(
+            "complete=" + newItem.complete +
+            "&title=" + newItem.title +
+            "&description=" + newItem.description);
+
+          xhr.addEventListener("readystatechange", self.processRequest, false);
+        }
+
+        e.preventDefault();
+      },
+
+      update: function(index, item) {
+        var self = this;
+
+        if (item.title && item.title.length > 0) {
+          xhr = new XMLHttpRequest();
+          xhr.open('POST', self.baseUrl + index, true);
+          xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded")
+          xhr.send(
+            "key=" + item.key +
+            "&complete=" + item.complete +
+            "&title=" + item.title +
+            "&description=" + item.description);
+
+          xhr.addEventListener("readystatechange", self.processRequest, false);
+        }
+      },
+
+      moveUp: function(index) {
+        var self = this;
+
+        xhr = new XMLHttpRequest();
+        xhr.open('POST', self.baseUrl + index + "/move-up", true);
+        xhr.send();
+
+        xhr.addEventListener("readystatechange", self.processRequest, false);
+      },
+
+      moveDown: function(index) {
+        var self = this;
+
+        xhr = new XMLHttpRequest();
+        xhr.open('POST', self.baseUrl + index + "/move-down", true);
+        xhr.send();
+
+        xhr.addEventListener("readystatechange", self.processRequest, false);
+      },
+
+      remove: function(index) {
+       var self = this;
+
+       if (confirm("Are you sure you want to permanently remove task #" + (index + 1) + "?")) {
+        xhr = new XMLHttpRequest();
+        xhr.open('DELETE', self.baseUrl + index, true);
+        xhr.send();
+       }
+
+       xhr.addEventListener("readystatechange", self.processRequest, false);
+      },
+
+      processRequest: function() {
+        var self = this;
+        if (xhr.readyState == 4 && xhr.status == 200) {
+          var response = JSON.parse(xhr.responseText);
+
+          self.setState({
+            items: response,
+            newItem: {complete: false, title: "", description: ""}});
+        }
+      },
+
+      render: function() {
+        var self = this;
+
+        if (self.firstTime) {
+          self.firstTime = false;
+          self.read();
+
+          return <div>
+          <h1>TODO List</h1> Initial Load... </div>
+        }
+
+        function renderItem(item, index) {
+          return (<ToDoItem item={item} index={index} update={self.update}
+            key={item.key} moveUp={self.moveUp} moveDown={self.moveDown}
+            remove={self.remove}
+            lastIndex={self.state.items.length - 1}/>);
+        };
+
+        var items = self.state.items.map(renderItem);
+
+        if (items.length == 0) {
+          items = <tr><td><label>The task list is empty!</label></td></tr>
+        }
+
+        return (
+          <div>
+          <h1>Task List</h1>
+          <div>
+          <form onSubmit={self.create}>
+          <span>
+          <input id="newTaskTitle" className="taskTitle" placeholder="Enter New Task Title" defaultValue={self.state.newItem.title}/> &nbsp; <button type="submit">Add Task</button>
+          </span>
+          </form>
+          </div>
+          <br />
+          <table>
+          <tbody>
+          {items}
+          </tbody>
+          </table>
+          </div>);
+      }
+    });
+
+    ReactDOM.render(<ToDoList />, container);
+
+    </script>
+
+  </body>
+</html>
